@@ -1,0 +1,10 @@
+service: () -> {
+    countdownActive: (text, nat64) -> (nat64);
+    createProject: (text, text, text, bool) -> (text);
+    getProjectById: (text) -> (opt record {id:text; title:text; interest_count:int; interest_email:vec text; description:text; logo_url:text; is_active:bool; is_suspend:bool}) query;
+    getProjects: () -> (vec record {id:text; title:text; interest_count:int; interest_email:vec text; description:text; logo_url:text; is_active:bool; is_suspend:bool}) query;
+    registerInterest: (text, text) -> (variant {Ok:text; Err:variant {projectNotExist:text; inactiveProjectId:text; suspendedProjectId:text}});
+    removeCountDown: (nat64) -> ();
+    suspendProject: (text) -> ();
+    updateProject: (text, text, text, text, bool) -> (text);
+}

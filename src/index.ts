@@ -18,109 +18,109 @@ import {
     update,
     ic
 } from 'azle';
-import { v4 as uuidv4 } from 'uuid';
 
 const Project = Record({
-    id          : text,
-    title       : text,
-    description : text,
-    logo_url    : text,
-    is_active   : bool,
-    is_suspend  : bool,
-    interest_count : int,
-    interest_email : Vec(text)
+    id: text,
+    title: text,
+    description: text,
+    logo_url: text,
+    is_active: bool,
+    is_suspend: bool,
+    interest_count: int,
+    interest_email: Vec(text)
 });
 
 const ErrorVar = Variant({
-    inactiveProjectId  : text,
-    suspendedProjectId : text,
-    projectNotExist    : text
+    inactiveProjectId: text,
+    suspendedProjectId: text,
+    projectNotExist: text,
+    invalidEmail: text,
+    unauthorizedAction: text,
+    reentrancyGuard: text
 });
 
-type Project = typeof Project;
+type ProjectType = typeof Project;
 
-let projectStorage = StableBTreeMap(text, Project, 0);
+let projectStorage = StableBTreeMap(text, ProjectType, 0);
 
 export default Canister({
-    // create a new project
     createProject: update([text, text, text, bool], text, (title, description, logo_url, is_active) => {
-        let info: Project = {
-            id             : uuidv4(),
-            title          : title,
-            description    : description,
-            logo_url       : logo_url,
-            is_active      : is_active,
-            is_suspend     : false,
-            interest_count : 0n,
-            interest_email : []
+        let info: ProjectType = {
+            id: uuidv4(),
+            title,
+            description,
+            logo_url,
+            is_active,
+            is_suspend: false,
+            interest_count: 0n,
+            interest_email: []
         };
         projectStorage.insert(info.id, info);
         return info.id;
     }),
 
-    // update an existing active project
     updateProject: update([text, text, text, text, bool], text, (id, title, description, logo_url, is_active) => {
         let projectOpt = projectStorage.get(id);
 
         if ('None' in projectOpt) {
-            throw new Error("Project not exist");
+            throw new ErrorVar.projectNotExist(id);
         }
 
-        let project: Project = projectOpt.Some;
+        let project: ProjectType = projectOpt.Some;
 
         if (project.is_suspend) {
-            throw new Error("project suspended");
+            throw new ErrorVar.suspendedProjectId(id);
         }
 
-        project.title       = title;
+        project.title = title;
         project.description = description;
-        project.logo_url    = logo_url;
-        project.is_active   = is_active;
+        project.logo_url = logo_url;
+        project.is_active = is_active;
         projectStorage.insert(project.id, project);
         return project.id;
     }),
 
-    // suspend project (non-revertable)
     suspendProject: update([text], Void, (id) => {
         let projectOpt = projectStorage.get(id);
 
-        if('None' in projectOpt){
-            throw new Error("project not exist");
+        if ('None' in projectOpt) {
+            throw new ErrorVar.projectNotExist(id);
         }
 
-        let project: Project = projectOpt.Some;
+        let project: ProjectType = projectOpt.Some;
 
         if (project.is_suspend) {
-            throw new Error("project suspended");
+            throw new ErrorVar.suspendedProjectId(id);
         }
+
+        // Implement access control here, e.g., check if the caller is authorized to suspend projects
 
         project.is_suspend = true;
         projectStorage.insert(project.id, project);
     }),
 
-    // allow user to register interest in the project
     registerInterest: update([text, text], Result(text, ErrorVar), (id, email) => {
+        if (!isValidEmail(email)) {
+            return Err({ invalidEmail: email });
+        }
+
         let projectOpt = projectStorage.get(id);
 
         if ('None' in projectOpt) {
-            return Err({
-                projectNotExist: id
-            });
+            return Err({ projectNotExist: id });
         }
 
-        let project: Project = projectOpt.Some;
+        let project: ProjectType = projectOpt.Some;
 
         if (!project.is_active) {
-            return Err({
-                inactiveProjectId: id
-            });
+            return Err({ inactiveProjectId: id });
         }
 
         if (project.is_suspend) {
-            return Err({
-                suspendedProjectId: id
-            });
+            return Err({ suspendedProjectId: id });
         }
+
+        // Implement reentrancy guard here
 
         project.interest_count++;
         project.interest_email.push(email);
@@ -129,42 +129,45 @@ export default Canister({
         return Ok("Interest registered successfully");
     }),
 
-    // set timer to auto activate the project
     countdownActive: update([text, Duration], TimerId, (id, delay) => {
         let projectOpt = projectStorage.get(id);
 
         if ('None' in projectOpt) {
-            throw new Error("Project not exist");
+            throw new ErrorVar.projectNotExist(id);
         }
 
-        let project: Project = projectOpt.Some;
+        let project: ProjectType = projectOpt.Some;
 
         if (project.is_suspend) {
-            throw new Error("project is suspend");
+            throw new ErrorVar.suspendedProjectId(id);
         }
+
+        // Implement access control here, e.g., check if the caller is authorized to activate projects
 
         const timerId = ic.setTimer(delay, () => {
             project.is_active = true;
             projectStorage.insert(project.id, project);
-            console.log(`project ${id} is activated`);
+            console.log(`Project ${id} is activated`);
         });
 
         return timerId;
     }),
 
-    // remove timer
     removeCountDown: update([TimerId], Void, (timerId) => {
         ic.clearTimer(timerId);
-        console.log(`project timer cancelled`);
+        console.log(`Project timer ${timerId} cancelled`);
     }),
 
-    // retrieve all project
-    getProjects: query([], Vec(Project), () => {
+    getProjects: query([], Vec(ProjectType), () => {
         return projectStorage.values();
     }),
 
-    // retrieve project by id
-    getProjectById: query([text], Opt(Project), (id) => {
+    getProjectById: query([text], Opt(ProjectType), (id) => {
         return projectStorage.get(id);
     }),
-})
+});
+
+function isValidEmail(email: string): boolean {
+    // Implement email validation logic here
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}

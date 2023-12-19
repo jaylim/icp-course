@@ -1,10 +1,41 @@
-service: () -> {
-    countdownActive: (text, nat64) -> (nat64);
-    createProject: (text, text, text, bool) -> (text);
-    getProjectById: (text) -> (opt record {id:text; title:text; interest_count:int; interest_email:vec text; description:text; logo_url:text; is_active:bool; is_suspend:bool}) query;
-    getProjects: () -> (vec record {id:text; title:text; interest_count:int; interest_email:vec text; description:text; logo_url:text; is_active:bool; is_suspend:bool}) query;
-    registerInterest: (text, text) -> (variant {Ok:text; Err:variant {projectNotExist:text; inactiveProjectId:text; suspendedProjectId:text}});
-    removeCountDown: (nat64) -> ();
-    suspendProject: (text) -> ();
-    updateProject: (text, text, text, text, bool) -> (text);
+type ErrorVar = variant {
+  projectNotExist : text;
+  invalidEmail : text;
+  inactiveProjectId : text;
+  reentrancyGuard : text;
+  unauthorizedAction : text;
+  suspendedProjectId : text;
+};
+type ProjectPayload = record {
+  title : text;
+  description : text;
+  logo_url : text;
+  is_active : bool;
+};
+type ProjectType = record {
+  id : text;
+  title : text;
+  interest_count : int;
+  interest_email : vec text;
+  createdAt : nat64;
+  description : text;
+  logo_url : text;
+  updatedAt : opt nat64;
+  is_active : bool;
+  is_suspend : bool;
+};
+type _AzleResult = variant { Ok : nat64; Err : text };
+type _AzleResult_1 = variant { Ok : ProjectType; Err : ErrorVar };
+type _AzleResult_2 = variant { Ok : ProjectType; Err : text };
+type _AzleResult_3 = variant { Ok : vec ProjectType; Err : text };
+type _AzleResult_4 = variant { Ok : text; Err : text };
+service : () -> {
+  countdownActive : (text, nat64) -> (_AzleResult);
+  createProject : (ProjectPayload) -> (_AzleResult_1);
+  getProjectById : (text) -> (_AzleResult_2) query;
+  getProjects : () -> (_AzleResult_3) query;
+  registerInterest : (text, text) -> (_AzleResult_4);
+  removeCountDown : (nat64) -> (_AzleResult_4);
+  suspendProject : (text) -> (_AzleResult_2);
+  updateProject : (text, ProjectPayload) -> (_AzleResult_2);
 }

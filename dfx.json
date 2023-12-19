@@ -1,13 +1,12 @@
 {
   "canisters": {
-    "project_launchpad": {
-      "type": "custom",
-      "main": "src/index.ts",
-      "candid": "src/index.did",
-      "build": "npx azle project_launchpad",
-      "ts": "src/index.ts",
-      "wasm": ".azle/project_launchpad/project_launchpad.wasm",
-      "gzip": true
-    }
+      "project_launchpad": {
+          "type": "custom",
+          "build": "npx azle project_launchpad",
+          "root": "src",
+          "ts": "src/index.ts",
+          "candid": "src/index.did",
+          "wasm": ".azle/project_launchpad/project_launchpad.wasm.gz"
+      }
   }
 }
